@@ -3,78 +3,199 @@ const http = require("http");
 const WebSocket = require("ws");
 const cors = require("cors");
 
+const HistoryCache = require("./src/cache");
+
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
 const tickers = ["AAPL", "TSLA", "BTC-USD", "ETH-USD", "MSFT", "GOOGL"];
+const MAX_HISTORY = 500; // max data points kept in memory per ticker
+const HISTORY_SEED = 50;  // data points pre-generated on startup
+const TICK_INTERVAL_MS = 1000;
+const CACHE_TTL_MS = 60_000; // 60 s
+
+// ─── Initial Prices ───────────────────────────────────────────────────────────
 
 let prices = {
-    "AAPL": 150,
-    "TSLA": 250,
+    "AAPL":    150,
+    "TSLA":    250,
     "BTC-USD": 30000,
     "ETH-USD": 2000,
-    "MSFT": 300,
-    "GOOGL": 2800,
+    "MSFT":    300,
+    "GOOGL":   2800,
 };
 
-// Store last 50 price points for each ticker
+// ─── Live History Store ───────────────────────────────────────────────────────
+// Rolling window of up to MAX_HISTORY price points per ticker.
+
+/** @type {Object.<string, Array<{time: string, price: number}>>} */
 const history = {};
-tickers.forEach(ticker => {
-    history[ticker] = Array.from({ length: 50 }, (_, i) => ({
-        time: new Date(Date.now() - (50 - i) * 1000).toISOString(),
-        price: prices[ticker] + (Math.random() - 0.5) * 10,
+tickers.forEach((ticker) => {
+    history[ticker] = Array.from({ length: HISTORY_SEED }, (_, i) => ({
+        time: new Date(Date.now() - (HISTORY_SEED - i) * TICK_INTERVAL_MS).toISOString(),
+        price: +(prices[ticker] + (Math.random() - 0.5) * prices[ticker] * 0.005).toFixed(4),
     }));
 });
 
+// ─── Cache ────────────────────────────────────────────────────────────────────
+
+const cache = new HistoryCache(CACHE_TTL_MS);
+
+// ─── REST API ─────────────────────────────────────────────────────────────────
+
+/**
+ * GET /tickers
+ * Returns the list of all available ticker symbols.
+ */
 app.get("/tickers", (req, res) => {
     res.json(tickers);
 });
 
+/**
+ * GET /history/:ticker[?limit=N]
+ * Returns historical price data for a given ticker.
+ *
+ * Cache behaviour:
+ *  - Cache TTL: 60 s
+ *  - X-Cache: HIT  → served from cache
+ *  - X-Cache: MISS → built from live history store, then cached
+ *
+ * Query params:
+ *  - limit (number, 1–500, default 100): number of most-recent data points to return
+ */
 app.get("/history/:ticker", (req, res) => {
     const { ticker } = req.params;
+
     if (!history[ticker]) {
-        return res.status(404).json({ error: "Ticker not found" });
+        return res.status(404).json({ error: `Ticker "${ticker}" not found` });
     }
-    res.json(history[ticker]);
+
+    // Parse & clamp limit
+    const limit = Math.min(
+        Math.max(1, parseInt(req.query.limit, 10) || 100),
+        MAX_HISTORY
+    );
+
+    // ── Cache lookup ──────────────────────────────────────────────────────────
+    const cached = cache.get(ticker);
+    if (cached) {
+        const slice = cached.slice(-limit);
+        res.setHeader("X-Cache", "HIT");
+        res.setHeader("X-Cache-TTL", `${CACHE_TTL_MS / 1000}s`);
+        return res.json(slice);
+    }
+
+    // ── Cache miss — build from live store ────────────────────────────────────
+    const data = history[ticker].slice(); // shallow copy for safe caching
+    cache.set(ticker, data);
+
+    const slice = data.slice(-limit);
+    res.setHeader("X-Cache", "MISS");
+    res.setHeader("X-Cache-TTL", `${CACHE_TTL_MS / 1000}s`);
+    res.json(slice);
 });
 
-wss.on("connection", (ws) => {
-    console.log("Client connected");
+/**
+ * GET /health
+ * Returns server uptime and cache diagnostics.
+ */
+app.get("/health", (req, res) => {
+    res.json({
+        status: "ok",
+        uptimeSeconds: Math.floor(process.uptime()),
+        tickers,
+        cache: cache.stats(),
+    });
 });
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+// Clients may send a subscribe message to filter updates by ticker:
+//   { "type": "subscribe", "tickers": ["AAPL", "TSLA"] }
+// Without a subscribe message all ticker updates are broadcast (backward-compat).
+
+wss.on("connection", (ws) => {
+    console.log("[WS] Client connected");
+
+    /** @type {Set<string>|null} null = subscribe to everything */
+    ws.subscribedTickers = null;
+
+    ws.on("message", (raw) => {
+        try {
+            const msg = JSON.parse(raw.toString());
+
+            if (msg.type === "subscribe" && Array.isArray(msg.tickers)) {
+                // Validate requested tickers
+                const valid = msg.tickers.filter((t) => tickers.includes(t));
+                ws.subscribedTickers = new Set(valid);
+                ws.send(JSON.stringify({
+                    type: "subscribed",
+                    tickers: valid,
+                    timestamp: new Date().toISOString(),
+                }));
+                console.log(`[WS] Client subscribed to: ${valid.join(", ")}`);
+            }
+
+            if (msg.type === "unsubscribe") {
+                ws.subscribedTickers = null;
+                ws.send(JSON.stringify({ type: "unsubscribed", timestamp: new Date().toISOString() }));
+            }
+        } catch {
+            // Ignore non-JSON messages
+        }
+    });
+
+    ws.on("close", () => console.log("[WS] Client disconnected"));
+    ws.on("error", (err) => console.error("[WS] Error:", err.message));
+});
+
+// ─── Market Data Feed (mock) ──────────────────────────────────────────────────
 
 const updateInterval = setInterval(() => {
     tickers.forEach((ticker) => {
-        const change = (Math.random() - 0.5) * (prices[ticker] * 0.001);
-        prices[ticker] += change;
+        // Simulate realistic price drift (±0.05 % per tick)
+        const change = (Math.random() - 0.5) * prices[ticker] * 0.001;
+        prices[ticker] = +(prices[ticker] + change).toFixed(4);
 
-        const data = {
-            ticker,
-            price: prices[ticker],
+        const point = {
             time: new Date().toISOString(),
+            price: prices[ticker],
         };
 
-        // Update history
-        history[ticker].push({ time: data.time, price: data.price });
-        if (history[ticker].length > 100) {
+        // Append to live history, evict oldest if over cap
+        history[ticker].push(point);
+        if (history[ticker].length > MAX_HISTORY) {
             history[ticker].shift();
         }
 
-        const message = JSON.stringify(data);
+        // Invalidate cache so next /history request gets fresh data
+        cache.invalidate(ticker);
+
+        const message = JSON.stringify({ ticker, ...point });
+
+        // Broadcast to subscribed WebSocket clients
         wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
-            }
+            if (client.readyState !== WebSocket.OPEN) return;
+            // If the client has a subscription filter, check it
+            if (client.subscribedTickers && !client.subscribedTickers.has(ticker)) return;
+            client.send(message);
         });
     });
-}, 1000);
+}, TICK_INTERVAL_MS);
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
     server.listen(3000, () => {
         console.log("Backend running on http://localhost:3000");
+        console.log(`Tickers: ${tickers.join(", ")}`);
+        console.log(`Cache TTL: ${CACHE_TTL_MS / 1000}s | Max history points: ${MAX_HISTORY}`);
     });
 }
 
-module.exports = { app, server, history, tickers, updateInterval };
+module.exports = { app, server, history, tickers, updateInterval, cache };

@@ -4,6 +4,7 @@ const WebSocket = require("ws");
 const cors = require("cors");
 
 const HistoryCache = require("./src/cache");
+const alertsStore = require("./src/alertsStore");
 
 const app = express();
 app.use(cors());
@@ -101,9 +102,51 @@ app.get("/history/:ticker", (req, res) => {
     res.json(slice);
 });
 
+// ─── Alerts REST API ──────────────────────────────────────────────────────────
+
+/**
+ * POST /alerts
+ * Create a price threshold alert.
+ * Body: { ticker, condition: "above"|"below", threshold }
+ */
+app.post("/alerts", (req, res) => {
+    const { ticker, condition, threshold } = req.body || {};
+
+    if (!tickers.includes((ticker || "").toUpperCase())) {
+        return res.status(400).json({ error: `Unknown ticker "${ticker}". Valid: ${tickers.join(", ")}` });
+    }
+
+    const result = alertsStore.create({ ticker, condition, threshold });
+    if (!result.ok) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    res.status(201).json(result.alert);
+});
+
+/**
+ * GET /alerts
+ * List all active (and triggered) alerts.
+ */
+app.get("/alerts", (req, res) => {
+    res.json(alertsStore.list());
+});
+
+/**
+ * DELETE /alerts/:id
+ * Remove an alert by id.
+ */
+app.delete("/alerts/:id", (req, res) => {
+    const deleted = alertsStore.remove(req.params.id);
+    if (!deleted) {
+        return res.status(404).json({ error: "Alert not found" });
+    }
+    res.status(204).end();
+});
+
 /**
  * GET /health
- * Returns server uptime and cache diagnostics.
+ * Returns server uptime, cache diagnostics, and active alert count.
  */
 app.get("/health", (req, res) => {
     res.json({
@@ -111,6 +154,7 @@ app.get("/health", (req, res) => {
         uptimeSeconds: Math.floor(process.uptime()),
         tickers,
         cache: cache.stats(),
+        alerts: { total: alertsStore.size },
     });
 });
 
@@ -176,6 +220,25 @@ const updateInterval = setInterval(() => {
         // Invalidate cache so next /history request gets fresh data
         cache.invalidate(ticker);
 
+        // ── Evaluate price alerts ─────────────────────────────────────────────
+        alertsStore.evaluateAll(ticker, prices[ticker], (alert, triggeredPrice) => {
+            const alertMsg = JSON.stringify({
+                type: "alert",
+                id: alert.id,
+                ticker: alert.ticker,
+                condition: alert.condition,
+                threshold: alert.threshold,
+                price: triggeredPrice,
+                time: new Date().toISOString(),
+            });
+            wss.clients.forEach((client) => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(alertMsg);
+                }
+            });
+            console.log(`[ALERT] ${alert.ticker} ${alert.condition} ${alert.threshold} → price=${triggeredPrice}`);
+        });
+
         const message = JSON.stringify({ ticker, ...point });
 
         // Broadcast to subscribed WebSocket clients
@@ -198,4 +261,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { app, server, history, tickers, updateInterval, cache };
+module.exports = { app, server, history, tickers, updateInterval, cache, alertsStore };

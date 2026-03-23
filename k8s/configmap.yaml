@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trading-dashboard-config
+  namespace: trading-dashboard
+  labels:
+    app.kubernetes.io/part-of: trading-dashboard
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Backend URL used by the frontend at build-time (override in your build pipeline)
+  VITE_API_URL: "http://localhost/api"
+  VITE_WS_URL: "ws://localhost/ws"

@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trading-dashboard-ingress
+  namespace: trading-dashboard
+  labels:
+    app.kubernetes.io/part-of: trading-dashboard
+  annotations:
+    # ── Nginx Ingress Controller annotations ───────────────────────────────────
+    kubernetes.io/ingress.class: "nginx"
+
+    # WebSocket support for /ws
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+    # Strip /api prefix before forwarding to backend
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+
+    # Allow large request bodies
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+    # Enable upstream keepalive
+    nginx.ingress.kubernetes.io/upstream-keepalive-connections: "10"
+spec:
+  rules:
+    - http:
+        paths:
+          # ── Backend REST API (/api/ → backend-svc, prefix stripped) ──────────
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 3000
+
+          # ── Backend WebSocket (/ws → backend-svc, with upgrade) ───────────────
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 3000
+
+          # ── Frontend SPA (catch-all) ──────────────────────────────────────────
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 80

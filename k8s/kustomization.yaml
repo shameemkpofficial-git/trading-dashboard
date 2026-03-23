@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-dashboard
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - ingress.yaml
+  - hpa.yaml
+
+# Image tags — override these during CI/CD:
+#   kustomize edit set image trading-dashboard/backend=registry/backend:v1.2.3
+images:
+  - name: trading-dashboard/backend
+    newTag: latest
+  - name: trading-dashboard/frontend
+    newTag: latest
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: trading-dashboard

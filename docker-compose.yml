@@ -1,14 +1,16 @@
 services:
-  backend:
+  backend-svc:
+    image: trading-dashboard-backend:latest
     build: ./backend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NODE_ENV=production
 
   frontend:
+    image: trading-dashboard-frontend:latest
     build: ./frontend
     ports:
       - "80:80"
     depends_on:
-      - backend
+      - backend-svc

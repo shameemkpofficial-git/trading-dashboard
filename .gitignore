@@ -1,1 +1,12 @@
-backend/node_modules
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+.npm-cache/
+backend/.npm-cache-backend/
+frontend/.npm-cache-frontend/
+
+dist/
+frontend/dist/
+
+.DS_Store

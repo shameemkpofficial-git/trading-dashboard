@@ -1,9 +1,17 @@
 import { create } from 'zustand';
 import type { PriceUpdate, ChartPoint, Alert, AlertEvent } from '../types';
-
-const isDev = import.meta.env.DEV;
-const API = isDev ? 'http://localhost:3000' : '/api';
-const WS_URL = isDev ? 'ws://localhost:3000' : `ws://${window.location.host}/ws`;
+import {
+  API_BASE,
+  WS_URL,
+  STORAGE_KEY_TOKEN,
+  STORAGE_KEY_USER,
+  TOAST_DURATION_MS,
+  MAX_CHART_POINTS,
+  WS_TYPE_ALERT,
+  WS_TYPE_SUBSCRIBED,
+  WS_TYPE_UNSUBSCRIBED,
+} from '../constants';
+import { ERR_SERVER_CONNECTION } from '../constants/strings';
 
 interface TradingState {
   tickers: string[];
@@ -55,25 +63,25 @@ export const useTradingStore = create<TradingState>((set) => ({
 
   login: async (username, password) => {
     try {
-      const res = await fetch(`${API}/login`, {
+      const res = await fetch(`${API_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (!res.ok) return { ok: false, error: data.error };
-      localStorage.setItem('trading_token', data.token);
-      localStorage.setItem('trading_user', JSON.stringify(data.user));
+      localStorage.setItem(STORAGE_KEY_TOKEN, data.token);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(data.user));
       set({ token: data.token, user: data.user });
       return { ok: true };
     } catch {
-      return { ok: false, error: 'Server connection failed' };
+      return { ok: false, error: ERR_SERVER_CONNECTION };
     }
   },
 
   register: async (username, password) => {
     try {
-      const res = await fetch(`${API}/register`, {
+      const res = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
@@ -82,25 +90,25 @@ export const useTradingStore = create<TradingState>((set) => ({
       if (!res.ok) return { ok: false, error: data.error };
       return { ok: true };
     } catch {
-      return { ok: false, error: 'Server connection failed' };
+      return { ok: false, error: ERR_SERVER_CONNECTION };
     }
   },
 
   logout: () => {
-    localStorage.removeItem('trading_token');
-    localStorage.removeItem('trading_user');
+    localStorage.removeItem(STORAGE_KEY_TOKEN);
+    localStorage.removeItem(STORAGE_KEY_USER);
     set({ token: null, user: null, alerts: [], triggeredAlerts: [] });
   },
 
   bootstrapAuth: () => {
-    const token = localStorage.getItem('trading_token');
-    const userStr = localStorage.getItem('trading_user');
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const userStr = localStorage.getItem(STORAGE_KEY_USER);
     if (token && userStr) {
       try {
         set({ token, user: JSON.parse(userStr) });
       } catch {
-        localStorage.removeItem('trading_token');
-        localStorage.removeItem('trading_user');
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+        localStorage.removeItem(STORAGE_KEY_USER);
       }
     }
   },
@@ -110,7 +118,7 @@ export const useTradingStore = create<TradingState>((set) => ({
       const newPrices = { ...state.prices, [update.ticker]: update.price };
       const tickerHistory = state.history[update.ticker] || [];
       const newPoint = { time: update.time, price: update.price };
-      const updatedHistory = [...tickerHistory, newPoint].slice(-100);
+      const updatedHistory = [...tickerHistory, newPoint].slice(-MAX_CHART_POINTS);
       return {
         prices: newPrices,
         history: { ...state.history, [update.ticker]: updatedHistory },
@@ -127,8 +135,8 @@ export const useTradingStore = create<TradingState>((set) => ({
     const { token } = useTradingStore.getState();
     if (!token) return;
     try {
-      const res = await fetch(`${API}/alerts`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(`${API_BASE}/alerts`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       const data: Alert[] = await res.json();
       set({ alerts: data });
@@ -141,11 +149,11 @@ export const useTradingStore = create<TradingState>((set) => ({
     const { token } = useTradingStore.getState();
     if (!token) return null;
     try {
-      const res = await fetch(`${API}/alerts`, {
+      const res = await fetch(`${API_BASE}/alerts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ ticker, condition, threshold }),
       });
@@ -162,9 +170,9 @@ export const useTradingStore = create<TradingState>((set) => ({
     const { token } = useTradingStore.getState();
     if (!token) return;
     try {
-      await fetch(`${API}/alerts/${id}`, {
+      await fetch(`${API_BASE}/alerts/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       set((state) => ({ alerts: state.alerts.filter((a) => a.id !== id) }));
     } catch {
@@ -188,25 +196,26 @@ export const useTradingStore = create<TradingState>((set) => ({
       ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
 
-        if (msg.type === 'alert') {
-          // A price threshold was crossed — push a toast
+        if (msg.type === WS_TYPE_ALERT) {
           const toastId = `${msg.id}-${Date.now()}`;
           const alertEvent: AlertEvent = { ...msg, toastId };
 
           useTradingStore.setState((state) => ({
             triggeredAlerts: [...state.triggeredAlerts, alertEvent],
-            // Mark the local alert as triggered
             alerts: state.alerts.map((a) =>
               a.id === msg.id ? { ...a, triggered: true } : a
             ),
           }));
 
-          // Auto-dismiss after 6 s
+          // Auto-dismiss after configured duration
           setTimeout(() => {
             useTradingStore.getState().dismissTriggeredAlert(toastId);
-          }, 6000);
+          }, TOAST_DURATION_MS);
 
-        } else if (msg.type === 'subscribed' || msg.type === 'unsubscribed') {
+        } else if (
+          msg.type === WS_TYPE_SUBSCRIBED ||
+          msg.type === WS_TYPE_UNSUBSCRIBED
+        ) {
           // ack messages — ignore
         } else {
           // Regular price update

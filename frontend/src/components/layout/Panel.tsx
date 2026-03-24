@@ -11,26 +11,33 @@ interface PanelProps {
   handleProps?: any;
 }
 
-const Panel = forwardRef<HTMLDivElement, PanelProps>(({ 
-  title, 
-  children, 
-  className = '', 
-  onClose, 
+/**
+ * Panel — reusable draggable dashboard panel with header and content area.
+ */
+const Panel = forwardRef<HTMLDivElement, PanelProps>(({
+  title,
+  children,
+  className = '',
+  onClose,
   onMaximize,
   handleProps,
-  ...props 
+  ...props
 }, ref) => {
   return (
-    <motion.div 
+    <motion.div
       ref={ref}
-      className={`panel-container ${className}`} 
+      className={`panel-container ${className}`}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       {...(props as any)}
     >
       <div className="panel-header" {...handleProps}>
-        <GripHorizontal size={14} className="text-secondary" style={{ marginRight: 8, opacity: 0.5, cursor: 'grab' }} />
+        <GripHorizontal
+          size={14}
+          className="text-secondary"
+          style={{ marginRight: 8, opacity: 0.5, cursor: 'grab' }}
+        />
         <span className="panel-title">{title}</span>
         <div style={{ flex: 1 }} />
         <div className="panel-actions">

@@ -1,13 +1,15 @@
-import axios from "axios";
+import { API_BASE } from '../constants';
 
-const API_BASE = "http://localhost:3000";
-
-export const getTickers = async () => {
-    const res = await axios.get(`${API_BASE}/tickers`);
-    return res.data;
+export const getTickers = async (token: string): Promise<string[]> => {
+  const res = await fetch(`${API_BASE}/tickers`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
 };
 
-export const getHistory = async (ticker: string) => {
-    const res = await axios.get(`${API_BASE}/history/${ticker}`);
-    return res.data;
+export const getHistory = async (ticker: string, token: string): Promise<any[]> => {
+  const res = await fetch(`${API_BASE}/history/${ticker}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
 };

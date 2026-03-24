@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useTradingStore } from '../store/useTradingStore';
+import { clearLayout } from '../utils/layoutUtils';
 
 export function useKeyboardShortcuts() {
   const { tickers, selectedTicker, setSelectedTicker } = useTradingStore();
@@ -7,11 +8,14 @@ export function useKeyboardShortcuts() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA'
+      ) {
         return;
       }
 
-      // 'ArrowUp' / 'ArrowDown' to navigate tickers
+      // ArrowUp / ArrowDown — navigate tickers
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
         const currentIndex = tickers.indexOf(selectedTicker);
@@ -23,13 +27,13 @@ export function useKeyboardShortcuts() {
         } else {
           newIndex = currentIndex - 1 >= 0 ? currentIndex - 1 : tickers.length - 1;
         }
-        
+
         setSelectedTicker(tickers[newIndex]);
       }
 
-      // 'Escape' to reset layout
+      // Escape — reset layout
       if (e.key === 'Escape') {
-        localStorage.removeItem('dashboard-layout');
+        clearLayout();
         window.location.reload();
       }
     };

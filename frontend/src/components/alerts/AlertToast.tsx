@@ -1,15 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
-import { useTradingStore } from '../store/useTradingStore';
-import type { AlertEvent } from '../types';
+import { useTradingStore } from '../../store/useTradingStore';
+import type { AlertEvent } from '../../types';
+import { TOAST_DURATION_MS } from '../../constants';
+import {
+  ALERT_ABOVE_LABEL,
+  ALERT_BELOW_LABEL,
+  TOAST_LABEL_TRIGGERED,
+  TOAST_PRICE_PREFIX,
+} from '../../constants/strings';
 
 interface ToastProps {
   alert: AlertEvent;
   onDismiss: (toastId: string) => void;
 }
-
-const DURATION_MS = 6000;
 
 const Toast: React.FC<ToastProps> = ({ alert, onDismiss }) => {
   const [progress, setProgress] = useState(100);
@@ -18,7 +23,7 @@ const Toast: React.FC<ToastProps> = ({ alert, onDismiss }) => {
     const start = Date.now();
     const frame = () => {
       const elapsed = Date.now() - start;
-      const pct = Math.max(0, 100 - (elapsed / DURATION_MS) * 100);
+      const pct = Math.max(0, 100 - (elapsed / TOAST_DURATION_MS) * 100);
       setProgress(pct);
       if (pct > 0) requestAnimationFrame(frame);
     };
@@ -27,7 +32,8 @@ const Toast: React.FC<ToastProps> = ({ alert, onDismiss }) => {
   }, []);
 
   const isAbove = alert.condition === 'above';
-  const color = isAbove ? 'var(--accent-green)' : 'var(--accent-red)';
+  const color   = isAbove ? 'var(--accent-green)' : 'var(--accent-red)';
+  const conditionLabel = isAbove ? ALERT_ABOVE_LABEL : ALERT_BELOW_LABEL;
 
   return (
     <motion.div
@@ -45,7 +51,7 @@ const Toast: React.FC<ToastProps> = ({ alert, onDismiss }) => {
         </div>
         <div className="toast-title">
           <span className="toast-ticker" style={{ color }}>{alert.ticker}</span>
-          <span className="toast-label">Price Alert Triggered</span>
+          <span className="toast-label">{TOAST_LABEL_TRIGGERED}</span>
         </div>
         <button className="toast-close" onClick={() => onDismiss(alert.toastId)}>
           <X size={13} />
@@ -55,10 +61,10 @@ const Toast: React.FC<ToastProps> = ({ alert, onDismiss }) => {
       {/* body */}
       <div className="toast-body">
         <span className="toast-condition" style={{ color }}>
-          {isAbove ? '↑ Above' : '↓ Below'} ${alert.threshold.toLocaleString()}
+          {conditionLabel} ${alert.threshold.toLocaleString()}
         </span>
         <span className="toast-price">
-          Now: <strong>${alert.price.toFixed(2)}</strong>
+          {TOAST_PRICE_PREFIX} <strong>${alert.price.toFixed(2)}</strong>
         </span>
       </div>
 

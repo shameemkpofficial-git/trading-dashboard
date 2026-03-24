@@ -1,6 +1,23 @@
 import React, { useState } from 'react';
-import { useTradingStore } from '../store/useTradingStore';
+import { useTradingStore } from '../../store/useTradingStore';
 import { LogIn, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  APP_SHORT_NAME,
+  APP_LOGO_INITIALS,
+  AUTH_WELCOME_SUBTITLE,
+  AUTH_REGISTER_SUBTITLE,
+  LABEL_USERNAME,
+  LABEL_PASSWORD,
+  PLACEHOLDER_USERNAME,
+  PLACEHOLDER_PASSWORD,
+  BTN_LOGIN,
+  BTN_REGISTER,
+  LINK_NO_ACCOUNT,
+  LINK_HAS_ACCOUNT,
+  ERR_LOGIN_FAILED,
+  ERR_REGISTER_FAILED,
+  MSG_REGISTER_SUCCESS,
+} from '../../constants/strings';
 
 const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -19,14 +36,14 @@ const AuthPage: React.FC = () => {
     try {
       if (isLogin) {
         const result = await login(username, password);
-        if (!result.ok) setError(result.error || 'Login failed');
+        if (!result.ok) setError(result.error || ERR_LOGIN_FAILED);
       } else {
         const result = await register(username, password);
         if (result.ok) {
           setIsLogin(true);
-          setError('Registration successful! Please login.');
+          setError(MSG_REGISTER_SUCCESS);
         } else {
-          setError(result.error || 'Registration failed');
+          setError(result.error || ERR_REGISTER_FAILED);
         }
       }
     } finally {
@@ -34,45 +51,47 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const isSuccess = error.includes('successful');
+
   return (
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">
-            <div className="logo-icon">TP</div>
-            <h1>Trading PRO</h1>
+            <div className="logo-icon">{APP_LOGO_INITIALS}</div>
+            <h1>{APP_SHORT_NAME}</h1>
           </div>
-          <p>{isLogin ? 'Welcome back to the dashboard' : 'Create your professional account'}</p>
+          <p>{isLogin ? AUTH_WELCOME_SUBTITLE : AUTH_REGISTER_SUBTITLE}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label>Username</label>
+            <label>{LABEL_USERNAME}</label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder={PLACEHOLDER_USERNAME}
               required
               autoComplete="username"
             />
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label>{LABEL_PASSWORD}</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={PLACEHOLDER_PASSWORD}
               required
-              autoComplete={isLogin ? "current-password" : "new-password"}
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
             />
           </div>
 
           {error && (
-            <div className={`auth-message ${error.includes('successful') ? 'success' : 'error'}`}>
-              {error.includes('successful') ? null : <AlertCircle size={16} />}
+            <div className={`auth-message ${isSuccess ? 'success' : 'error'}`}>
+              {!isSuccess && <AlertCircle size={16} />}
               <span>{error}</span>
             </div>
           )}
@@ -80,15 +99,20 @@ const AuthPage: React.FC = () => {
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
+            ) : isLogin ? (
+              <><LogIn size={20} /> {BTN_LOGIN}</>
             ) : (
-              isLogin ? <><LogIn size={20} /> Login</> : <><UserPlus size={20} /> Register</>
+              <><UserPlus size={20} /> {BTN_REGISTER}</>
             )}
           </button>
         </form>
 
         <div className="auth-footer">
-          <button onClick={() => { setIsLogin(!isLogin); setError(''); }} className="toggle-button">
-            {isLogin ? "Don't have an account? Register" : "Already have an account? Login"}
+          <button
+            onClick={() => { setIsLogin(!isLogin); setError(''); }}
+            className="toggle-button"
+          >
+            {isLogin ? LINK_NO_ACCOUNT : LINK_HAS_ACCOUNT}
           </button>
         </div>
       </div>

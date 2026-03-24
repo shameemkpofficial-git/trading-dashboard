@@ -1,23 +1,24 @@
 import { useEffect } from 'react'
 import { useTradingStore } from './store/useTradingStore'
-import DashboardLayout from './components/DashboardLayout'
-import AuthPage from './components/AuthPage'
+import DashboardLayout from './components/layout/DashboardLayout'
+import AuthPage from './components/auth/AuthPage'
+import DashboardHeader from './components/layout/DashboardHeader'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
-import { LogOut, User } from 'lucide-react'
+import { API_BASE } from './constants'
 
 function App() {
   useKeyboardShortcuts();
-  const { 
-    selectedTicker, 
-    setTickers, 
-    setSelectedTicker, 
-    setHistory, 
-    connectWebSocket, 
+  const {
+    selectedTicker,
+    setTickers,
+    setSelectedTicker,
+    setHistory,
+    connectWebSocket,
     disconnectWebSocket,
     token,
     user,
     logout,
-    bootstrapAuth
+    bootstrapAuth,
   } = useTradingStore()
 
   useEffect(() => {
@@ -27,12 +28,11 @@ function App() {
   useEffect(() => {
     if (!token) return;
 
-    // Fetch available tickers
-    fetch('http://localhost:3000/tickers', {
-      headers: { Authorization: `Bearer ${token}` }
+    fetch(`${API_BASE}/tickers`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (Array.isArray(data)) {
           setTickers(data)
           if (data.length > 0 && !selectedTicker) setSelectedTicker(data[0])
@@ -44,12 +44,11 @@ function App() {
   useEffect(() => {
     if (!selectedTicker || !token) return
 
-    // Fetch history for selected ticker
-    fetch(`http://localhost:3000/history/${selectedTicker}`, {
-      headers: { Authorization: `Bearer ${token}` }
+    fetch(`${API_BASE}/history/${selectedTicker}`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (Array.isArray(data)) {
           setHistory(selectedTicker, data)
         }
@@ -69,20 +68,7 @@ function App() {
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="header-left">
-          <h1>Trading Dashboard PRO</h1>
-        </div>
-        <div className="header-right">
-          <div className="user-info">
-            <User size={16} />
-            <span>{user?.username}</span>
-          </div>
-          <button className="icon-button logout-btn" onClick={logout} title="Logout">
-            <LogOut size={20} />
-          </button>
-        </div>
-      </header>
+      <DashboardHeader username={user?.username} onLogout={logout} />
       <main className="dashboard-main">
         <DashboardLayout />
       </main>
@@ -90,6 +76,4 @@ function App() {
   )
 }
 
-
 export default App
-

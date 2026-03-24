@@ -1,7 +1,23 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Plus, Trash2, AlertTriangle } from 'lucide-react';
-import { useTradingStore } from '../store/useTradingStore';
+import { useTradingStore } from '../../store/useTradingStore';
+import {
+  ALERT_ABOVE_LABEL,
+  ALERT_BELOW_LABEL,
+  ALERT_ABOVE_ARROW,
+  ALERT_BELOW_ARROW,
+  ALERT_BTN_ADD,
+  ALERT_BTN_LOADING,
+  ALERT_PLACEHOLDER_PRICE,
+  ALERT_SECTION_ACTIVE,
+  ALERT_SECTION_TRIGGERED,
+  ALERT_SECTION_FIRED,
+  ALERT_EMPTY,
+  ERR_INVALID_PRICE,
+  ERR_CREATE_ALERT,
+} from '../../constants/strings';
+import { formatLocaleNumber } from '../../utils/formatters';
 
 const AlertManager: React.FC = () => {
   const { tickers, alerts, addAlert, removeAlert } = useTradingStore();
@@ -15,7 +31,7 @@ const AlertManager: React.FC = () => {
   const handleAdd = async () => {
     const val = parseFloat(threshold);
     if (isNaN(val) || val <= 0) {
-      setError('Enter a valid positive price.');
+      setError(ERR_INVALID_PRICE);
       return;
     }
     setError('');
@@ -23,18 +39,18 @@ const AlertManager: React.FC = () => {
     const result = await addAlert(ticker, condition, val);
     setLoading(false);
     if (!result) {
-      setError('Failed to create alert. Check the server.');
+      setError(ERR_CREATE_ALERT);
     } else {
       setThreshold('');
     }
   };
 
-  const activeAlerts = alerts.filter((a) => !a.triggered);
-  const firedAlerts = alerts.filter((a) => a.triggered);
+  const activeAlerts  = alerts.filter((a) => !a.triggered);
+  const firedAlerts   = alerts.filter((a) => a.triggered);
 
   return (
     <div className="alert-manager">
-      {/* ── Create form ─────────────────────────────────────────────────────── */}
+      {/* ── Create form ────────────────────────────────────────────────────────── */}
       <div className="alert-form">
         <div className="alert-form-row">
           <select
@@ -52,20 +68,20 @@ const AlertManager: React.FC = () => {
               className={`toggle-btn ${condition === 'above' ? 'active-above' : ''}`}
               onClick={() => setCondition('above')}
             >
-              ↑ Above
+              {ALERT_ABOVE_LABEL}
             </button>
             <button
               className={`toggle-btn ${condition === 'below' ? 'active-below' : ''}`}
               onClick={() => setCondition('below')}
             >
-              ↓ Below
+              {ALERT_BELOW_LABEL}
             </button>
           </div>
 
           <input
             type="number"
             className="alert-input"
-            placeholder="Price"
+            placeholder={ALERT_PLACEHOLDER_PRICE}
             value={threshold}
             onChange={(e) => setThreshold(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
@@ -81,7 +97,7 @@ const AlertManager: React.FC = () => {
             whileTap={{ scale: 0.95 }}
           >
             <Plus size={14} />
-            {loading ? '…' : 'Add'}
+            {loading ? ALERT_BTN_LOADING : ALERT_BTN_ADD}
           </motion.button>
         </div>
 
@@ -96,11 +112,11 @@ const AlertManager: React.FC = () => {
         )}
       </div>
 
-      {/* ── Active alerts ─────────────────────────────────────────────────── */}
+      {/* ── Active alerts ──────────────────────────────────────────────────────── */}
       <div className="alert-list-section">
         <div className="alert-section-header">
           <Bell size={12} />
-          <span>Active ({activeAlerts.length})</span>
+          <span>{ALERT_SECTION_ACTIVE} ({activeAlerts.length})</span>
         </div>
 
         <AnimatePresence>
@@ -111,7 +127,7 @@ const AlertManager: React.FC = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              No active alerts
+              {ALERT_EMPTY}
             </motion.p>
           )}
           {activeAlerts.map((alert) => (
@@ -125,7 +141,7 @@ const AlertManager: React.FC = () => {
             >
               <span className="alert-item-ticker">{alert.ticker}</span>
               <span className={`alert-item-condition ${alert.condition}`}>
-                {alert.condition === 'above' ? '↑' : '↓'} ${alert.threshold.toLocaleString()}
+                {alert.condition === 'above' ? ALERT_ABOVE_ARROW : ALERT_BELOW_ARROW} ${formatLocaleNumber(alert.threshold)}
               </span>
               <motion.button
                 className="alert-delete-btn"
@@ -141,20 +157,20 @@ const AlertManager: React.FC = () => {
         </AnimatePresence>
       </div>
 
-      {/* ── Fired alerts ─────────────────────────────────────────────────── */}
+      {/* ── Fired alerts ───────────────────────────────────────────────────────── */}
       {firedAlerts.length > 0 && (
         <div className="alert-list-section">
           <div className="alert-section-header fired">
             <AlertTriangle size={12} />
-            <span>Triggered ({firedAlerts.length})</span>
+            <span>{ALERT_SECTION_TRIGGERED} ({firedAlerts.length})</span>
           </div>
           {firedAlerts.map((alert) => (
             <div key={alert.id} className="alert-item triggered">
               <span className="alert-item-ticker">{alert.ticker}</span>
               <span className={`alert-item-condition ${alert.condition}`}>
-                {alert.condition === 'above' ? '↑' : '↓'} ${alert.threshold.toLocaleString()}
+                {alert.condition === 'above' ? ALERT_ABOVE_ARROW : ALERT_BELOW_ARROW} ${formatLocaleNumber(alert.threshold)}
               </span>
-              <span className="alert-item-badge">fired</span>
+              <span className="alert-item-badge">{ALERT_SECTION_FIRED}</span>
               <motion.button
                 className="alert-delete-btn"
                 onClick={() => removeAlert(alert.id)}

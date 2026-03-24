@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import AlertToast from './AlertToast';
-import { useTradingStore } from '../store/useTradingStore';
+import AlertToast from '../alerts/AlertToast';
+import { useTradingStore } from '../../store/useTradingStore';
 
 // Mock the store hook
-vi.mock('../store/useTradingStore', () => ({
+vi.mock('../../store/useTradingStore', () => ({
   useTradingStore: vi.fn(),
 }));
 

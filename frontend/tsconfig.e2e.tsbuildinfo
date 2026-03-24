@@ -1,0 +1,1 @@
+{"root":["./e2e/dashboard.spec.ts","./e2e/login.spec.ts","./playwright.config.ts"],"version":"5.9.3"}

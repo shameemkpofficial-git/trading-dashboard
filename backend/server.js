@@ -71,6 +71,15 @@ app.use(createHistory({ history, cache }));
 app.use(createAlerts({ tickers, alertsStore }));
 app.use(createHealth({ tickers, cache, alertsStore }));
 
+app.use((err, req, res, next) => {
+  logger.error({ err, req: { method: req.method, url: req.url } }, 'Unhandled API Error');
+  
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal Server Error'
+  });
+});
+
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 // Clients may send a subscribe message to filter updates by ticker:
 //   { "type": "subscribe", "tickers": ["AAPL", "TSLA"] }

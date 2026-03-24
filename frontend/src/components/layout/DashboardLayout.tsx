@@ -36,9 +36,9 @@ const DashboardLayout: React.FC = () => {
 
   const [layouts, setLayouts] = useState(DEFAULT_LAYOUT);
 
-  const onLayoutChange = (_: any, allLayouts: any) => {
-    setLayouts(allLayouts);
-    saveLayout(allLayouts);
+  const onLayoutChange: React.ComponentProps<typeof ResponsiveGridLayout>['onLayoutChange'] = (_, allLayouts) => {
+    setLayouts(allLayouts as typeof layouts);
+    saveLayout(allLayouts as typeof layouts);
   };
 
   return (

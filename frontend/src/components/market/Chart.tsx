@@ -47,7 +47,10 @@ const Chart = memo(({ data }: Props) => {
               color: CHART_TOOLTIP_COLOR,
             }}
             labelFormatter={(label) => formatTimeFull(label)}
-            formatter={(value: any) => [formatPrice(Number(value)), 'Price']}
+            formatter={(value: unknown) => {
+              const numValue = Array.isArray(value) ? value[0] : value;
+              return [formatPrice(Number(numValue || 0)), 'Price'];
+            }}
           />
           <Line
             type="monotone"

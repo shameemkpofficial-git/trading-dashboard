@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T>(undefined);
-  useEffect(() => {
-    ref.current = value;
-  }, [value]);
-  return ref.current;
+  const [tuple, setTuple] = useState<[T | undefined, T]>([undefined, value]);
+
+  if (tuple[1] !== value) {
+    setTuple([tuple[1], value]);
+  }
+
+  return tuple[0];
 }

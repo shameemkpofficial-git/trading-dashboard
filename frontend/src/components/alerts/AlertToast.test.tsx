@@ -21,7 +21,7 @@ describe('AlertToast', () => {
       },
     ];
 
-    (useTradingStore as any).mockReturnValue({
+    vi.mocked(useTradingStore).mockReturnValue({
       triggeredAlerts: mockAlerts,
       dismissTriggeredAlert: vi.fn(),
     });
@@ -47,7 +47,7 @@ describe('AlertToast', () => {
       },
     ];
 
-    (useTradingStore as any).mockReturnValue({
+    vi.mocked(useTradingStore).mockReturnValue({
       triggeredAlerts: mockAlerts,
       dismissTriggeredAlert: mockDismiss,
     });
@@ -61,7 +61,7 @@ describe('AlertToast', () => {
   });
 
   it('should render nothing if there are no triggered alerts', () => {
-    (useTradingStore as any).mockReturnValue({
+    vi.mocked(useTradingStore).mockReturnValue({
       triggeredAlerts: [],
       dismissTriggeredAlert: vi.fn(),
     });

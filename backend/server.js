@@ -5,6 +5,7 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
 const logger = require('./src/utils/logger');
+const { apiLimiter } = require('./src/utils/rateLimiters');
 
 const HistoryCache = require('./src/cache');
 const alertsStore = require('./src/alertsStore');
@@ -66,6 +67,10 @@ const wss = new WebSocket.Server({ server });
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(authRoutes);
+
+// Protect all following data endpoints with the API rate limiter
+app.use(apiLimiter);
+
 app.use(createTickers({ tickers }));
 app.use(createHistory({ history, cache }));
 app.use(createAlerts({ tickers, alertsStore }));

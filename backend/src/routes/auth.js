@@ -4,6 +4,7 @@
 
 const express = require('express');
 const auth = require('../auth');
+const { authLimiter } = require('../utils/rateLimiters');
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const router = express.Router();
  * POST /register
  * Register a new user.
  */
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   const result = await auth.register(username, password);
   if (!result.ok) {
@@ -24,7 +25,7 @@ router.post('/register', async (req, res) => {
  * POST /login
  * Authenticate user and return JWT.
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { username, password } = req.body || {};
   const result = await auth.login(username, password);
   if (!result.ok) {

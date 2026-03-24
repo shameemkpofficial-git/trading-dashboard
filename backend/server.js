@@ -175,4 +175,42 @@ if (require.main === module) {
   });
 }
 
+// ─── Graceful Shutdown ───────────────────────────────────────────────────────
+
+/**
+ * Cleanly shut down servers and intervals before exiting the process.
+ * @param {string} signal - The signal that triggered the shutdown.
+ */
+function gracefulShutdown(signal) {
+  logger.info({ signal }, "Graceful shutdown initiated...");
+
+  // 1. Stop generating mock data
+  clearInterval(updateInterval);
+  logger.info("Market data update interval stopped.");
+
+  // 2. Stop receiving new WebSocket connections
+  wss.close((err) => {
+    if (err) {
+      logger.error({ err }, "Error closing WebSocket server");
+    } else {
+      logger.info("WebSocket server closed.");
+    }
+  });
+
+  // 3. Stop receiving new HTTP connections and finish active requests
+  server.close(() => {
+    logger.info("HTTP server closed.");
+    process.exit(0);
+  });
+
+  // 4. Force exit if it takes too long
+  setTimeout(() => {
+    logger.warn("Shutdown timed out, forcing exit.");
+    process.exit(1);
+  }, 10000);
+}
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
 module.exports = { app, server, history, tickers, updateInterval, cache, alertsStore };

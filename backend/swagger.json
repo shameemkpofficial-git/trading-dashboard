@@ -1,0 +1,272 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Trading Dashboard API",
+    "version": "1.0.0",
+    "description": "API documentation for the Trading Dashboard REST and WebSocket services."
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Relative server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/tickers": {
+      "get": {
+        "summary": "Get available tickers",
+        "description": "Returns a list of all currently supported ticker symbols.",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/{ticker}": {
+      "get": {
+        "summary": "Get historical price data",
+        "description": "Returns a list of recent price points for the specified ticker. Data is cached for 60 seconds.",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Ticker symbol (e.g., AAPL)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 100,
+              "minimum": 1,
+              "maximum": 500
+            },
+            "description": "Number of most recent data points to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "X-Cache": {
+                "description": "Indicates HIT or MISS for the cache",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "time": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "price": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticker not found"
+          }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "summary": "List active alerts",
+        "description": "Returns all configured price threshold alerts.",
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a new price alert",
+        "description": "Creates an alert that triggers when a ticker price crosses the specified threshold.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ticker", "condition", "threshold"],
+                "properties": {
+                  "ticker": {
+                    "type": "string",
+                    "example": "AAPL"
+                  },
+                  "condition": {
+                    "type": "string",
+                    "enum": ["above", "below"],
+                    "example": "above"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "example": 160.5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Alert created successfully"
+          },
+          "400": {
+            "description": "Invalid input parameters"
+          }
+        }
+      }
+    },
+    "/alerts/{id}": {
+      "delete": {
+        "summary": "Delete an alert",
+        "description": "Removes an alert by its ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Alert deleted"
+          },
+          "404": {
+            "description": "Alert not found"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Get system health",
+        "description": "Returns system status, active tickers count, alert count, and cache statistics.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "System health response"
+          }
+        }
+      }
+    },
+    "/register": {
+      "post": {
+        "summary": "Register new user",
+        "description": "Create a new user account.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "trader1"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "securepassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Invalid input or user exists"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "summary": "Login",
+        "description": "Authenticate user and return a JWT token.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "example": "trader1"
+                  },
+                  "password": {
+                    "type": "string",
+                    "example": "securepassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token generated successfully"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    }
+  }
+}

@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger.json');
 
 const HistoryCache = require('./src/cache');
 const alertsStore = require('./src/alertsStore');
@@ -61,6 +63,7 @@ const wss = new WebSocket.Server({ server });
 
 // ─── Mount Routes ─────────────────────────────────────────────────────────────
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(authRoutes);
 app.use(createTickers({ tickers }));
 app.use(createHistory({ history, cache }));

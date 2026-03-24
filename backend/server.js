@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger.json');
+const logger = require('./src/utils/logger');
 
 const HistoryCache = require('./src/cache');
 const alertsStore = require('./src/alertsStore');
@@ -76,7 +77,7 @@ app.use(createHealth({ tickers, cache, alertsStore }));
 // Without a subscribe message all ticker updates are broadcast (backward-compat).
 
 wss.on('connection', (ws) => {
-  console.log('[WS] Client connected');
+  logger.info({ event: 'ws_connected' }, 'Client connected');
 
   /** @type {Set<string>|null} null = subscribe to everything */
   ws.subscribedTickers = null;
@@ -93,7 +94,7 @@ wss.on('connection', (ws) => {
           tickers: valid,
           timestamp: new Date().toISOString(),
         }));
-        console.log(`[WS] Client subscribed to: ${valid.join(', ')}`);
+        logger.info({ event: 'ws_subscribed', tickers: valid }, 'Client subscribed');
       }
 
       if (msg.type === WS_TYPE_UNSUBSCRIBE) {
@@ -105,8 +106,8 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => console.log('[WS] Client disconnected'));
-  ws.on('error', (err) => console.error('[WS] Error:', err.message));
+  ws.on('close', () => logger.info({ event: 'ws_disconnected' }, 'Client disconnected'));
+  ws.on('error', (err) => logger.error({ event: 'ws_error', error: err.message }, 'WebSocket Error'));
 });
 
 // ─── Market Data Feed (mock) ──────────────────────────────────────────────────
@@ -141,7 +142,7 @@ const updateInterval = setInterval(() => {
         time: new Date().toISOString(),
       });
       broadcastToAll(wss, alertMsg);
-      console.log(`[ALERT] ${alert.ticker} ${alert.condition} ${alert.threshold} → price=${triggeredPrice}`);
+      logger.info({ event: 'alert_triggered', ticker: alert.ticker, condition: alert.condition, threshold: alert.threshold, price: triggeredPrice }, 'Price threshold triggered');
     });
 
     const message = JSON.stringify({ ticker, ...point });
@@ -154,9 +155,9 @@ const updateInterval = setInterval(() => {
 if (require.main === module) {
   const PORT = process.env.PORT || DEFAULT_PORT;
   server.listen(PORT, () => {
-    console.log(`Backend running on http://localhost:${PORT}`);
-    console.log(`Tickers: ${tickers.join(', ')}`);
-    console.log(`Cache TTL: ${CACHE_TTL_MS / 1000}s | Max history points: ${MAX_HISTORY}`);
+    logger.info({ port: PORT }, `Backend running on port ${PORT}`);
+    logger.info({ tickers }, `Tickers loaded`);
+    logger.info({ ttl: CACHE_TTL_MS / 1000, maxHistory: MAX_HISTORY }, `Cache configured`);
   });
 }
 

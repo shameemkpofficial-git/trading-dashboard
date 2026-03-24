@@ -66,8 +66,9 @@ const AuthPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label>{LABEL_USERNAME}</label>
+            <label htmlFor="username">{LABEL_USERNAME}</label>
             <input
+              id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -78,8 +79,9 @@ const AuthPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label>{LABEL_PASSWORD}</label>
+            <label htmlFor="password">{LABEL_PASSWORD}</label>
             <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -90,22 +92,31 @@ const AuthPage: React.FC = () => {
           </div>
 
           {error && (
-            <div className={`auth-message ${isSuccess ? 'success' : 'error'}`}>
-              {!isSuccess && <AlertCircle size={16} />}
+            <div 
+              className={`auth-message ${isSuccess ? 'success' : 'error'}`}
+              role="alert"
+            >
+              {!isSuccess && <AlertCircle size={16} aria-hidden="true" />}
               <span>{error}</span>
             </div>
           )}
 
-          <button type="submit" className="auth-button" disabled={loading}>
+          <button 
+            type="submit" 
+            className="auth-button" 
+            disabled={loading}
+            aria-busy={loading}
+          >
             {loading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" size={20} aria-hidden="true" />
             ) : isLogin ? (
-              <><LogIn size={20} /> {BTN_LOGIN}</>
+              <><LogIn size={20} aria-hidden="true" /> {BTN_LOGIN}</>
             ) : (
-              <><UserPlus size={20} /> {BTN_REGISTER}</>
+              <><UserPlus size={20} aria-hidden="true" /> {BTN_REGISTER}</>
             )}
           </button>
         </form>
+
 
         <div className="auth-footer">
           <button

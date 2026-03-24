@@ -30,24 +30,35 @@ const Panel = forwardRef<HTMLDivElement, PanelProps>(({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      role="region"
+      aria-label={`${title} panel`}
       {...props}
     >
       <div className="panel-header" {...handleProps}>
         <GripHorizontal
           size={14}
           className="text-secondary"
+          aria-hidden="true"
           style={{ marginRight: 8, opacity: 0.5, cursor: 'grab' }}
         />
         <span className="panel-title">{title}</span>
         <div style={{ flex: 1 }} />
         <div className="panel-actions">
           {onMaximize && (
-            <button className="panel-action-btn" onClick={onMaximize}>
+            <button 
+              className="panel-action-btn" 
+              onClick={onMaximize}
+              aria-label={`Maximize ${title}`}
+            >
               <Maximize2 size={14} />
             </button>
           )}
           {onClose && (
-            <button className="panel-action-btn" onClick={onClose}>
+            <button 
+              className="panel-action-btn" 
+              onClick={onClose}
+              aria-label={`Close ${title}`}
+            >
               <X size={14} />
             </button>
           )}

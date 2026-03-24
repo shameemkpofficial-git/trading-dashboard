@@ -24,11 +24,18 @@ interface Props {
   ticker: string;
 }
 
-const Chart = memo(({ data }: Props) => {
+const Chart = memo(({ data, ticker }: Props) => {
   return (
-    <div className="chart-container" style={{ width: '100%', height: '100%' }}>
+    <div 
+      className="chart-container" 
+      style={{ width: '100%', height: '100%' }}
+      role="img"
+      aria-label={`Interactive price chart for ${ticker}`}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
+
+
           <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_STROKE} />
           <XAxis
             dataKey="time"

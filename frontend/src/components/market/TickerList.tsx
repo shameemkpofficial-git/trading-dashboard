@@ -18,6 +18,15 @@ const TickerItem = memo(({ ticker, price, isActive, onSelect }: TickerItemProps)
   if (flash === 'up') flashClass = 'flash-up';
   if (flash === 'down') flashClass = 'flash-down';
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect(ticker);
+    }
+  };
+
+  const currentPriceFormatted = price ? formatPrice(price) : TICKER_LOADING;
+
   return (
     <motion.li
       layout
@@ -25,15 +34,21 @@ const TickerItem = memo(({ ticker, price, isActive, onSelect }: TickerItemProps)
       animate={{ opacity: 1, x: 0 }}
       className={`${isActive ? 'active' : ''} ${flashClass}`}
       onClick={() => onSelect(ticker)}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="option"
+      aria-selected={isActive}
+      aria-label={`${ticker} ticker, current price ${currentPriceFormatted}`}
       whileHover={{ scale: 1.02, backgroundColor: 'var(--bg-tertiary)' }}
       whileTap={{ scale: 0.98 }}
     >
-      <span className="ticker-name">{ticker}</span>
+      <span className="ticker-name" aria-hidden="true">{ticker}</span>
       <motion.span
         key={price}
         initial={{ opacity: 0.5, y: -2 }}
         animate={{ opacity: 1, y: 0 }}
         className={`ticker-price ${flash === 'up' ? 'text-green-500' : flash === 'down' ? 'text-red-500' : ''}`}
+        aria-hidden="true"
         style={{
           color:
             flash === 'up'
@@ -43,7 +58,7 @@ const TickerItem = memo(({ ticker, price, isActive, onSelect }: TickerItemProps)
               : 'inherit',
         }}
       >
-        {price ? formatPrice(price) : TICKER_LOADING}
+        {currentPriceFormatted}
       </motion.span>
     </motion.li>
   );
@@ -61,7 +76,7 @@ interface Props {
 const TickerList = ({ tickers, prices, selectedTicker, onSelectTicker }: Props) => {
   return (
     <div className="ticker-list">
-      <ul>
+      <ul role="listbox" aria-label="Available trading tickers">
         {tickers.map((ticker) => (
           <TickerItem
             key={ticker}

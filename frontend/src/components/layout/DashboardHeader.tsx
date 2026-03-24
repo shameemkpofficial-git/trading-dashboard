@@ -19,16 +19,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ username, onLogout })
       </div>
       <div className="header-right">
         <div className="user-info">
-          <User size={16} />
+          <User size={16} aria-hidden="true" />
           <span>{username}</span>
         </div>
         <button
           className="icon-button logout-btn"
           onClick={onLogout}
           title={BTN_LOGOUT}
+          aria-label={BTN_LOGOUT}
         >
-          <LogOut size={20} />
+          <LogOut size={20} aria-hidden="true" />
         </button>
+
       </div>
     </header>
   );

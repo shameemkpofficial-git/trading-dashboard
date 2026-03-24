@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import type { PriceUpdate, ChartPoint, Alert, AlertEvent } from '../types';
 
-const API = 'http://localhost:3000';
-const WS_URL = 'ws://localhost:3000';
+const isDev = import.meta.env.DEV;
+const API = isDev ? 'http://localhost:3000' : '/api';
+const WS_URL = isDev ? 'ws://localhost:3000' : `ws://${window.location.host}/ws`;
 
 interface TradingState {
   tickers: string[];
@@ -14,6 +15,8 @@ interface TradingState {
   // ── Alerts ──────────────────────────────────────────────────────────────────
   alerts: Alert[];
   triggeredAlerts: AlertEvent[];
+  user: { username: string } | null;
+  token: string | null;
 
   // Actions
   setTickers: (tickers: string[]) => void;
@@ -22,6 +25,12 @@ interface TradingState {
   setHistory: (ticker: string, history: ChartPoint[]) => void;
   connectWebSocket: () => void;
   disconnectWebSocket: () => void;
+
+  // Auth actions
+  login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  register: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  logout: () => void;
+  bootstrapAuth: () => void;
 
   // Alert actions
   fetchAlerts: () => Promise<void>;
@@ -38,9 +47,63 @@ export const useTradingStore = create<TradingState>((set) => ({
   ws: null,
   alerts: [],
   triggeredAlerts: [],
+  user: null,
+  token: null,
 
   setTickers: (tickers) => set({ tickers }),
   setSelectedTicker: (ticker) => set({ selectedTicker: ticker }),
+
+  login: async (username, password) => {
+    try {
+      const res = await fetch(`${API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error };
+      localStorage.setItem('trading_token', data.token);
+      localStorage.setItem('trading_user', JSON.stringify(data.user));
+      set({ token: data.token, user: data.user });
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Server connection failed' };
+    }
+  },
+
+  register: async (username, password) => {
+    try {
+      const res = await fetch(`${API}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error };
+      return { ok: true };
+    } catch {
+      return { ok: false, error: 'Server connection failed' };
+    }
+  },
+
+  logout: () => {
+    localStorage.removeItem('trading_token');
+    localStorage.removeItem('trading_user');
+    set({ token: null, user: null, alerts: [], triggeredAlerts: [] });
+  },
+
+  bootstrapAuth: () => {
+    const token = localStorage.getItem('trading_token');
+    const userStr = localStorage.getItem('trading_user');
+    if (token && userStr) {
+      try {
+        set({ token, user: JSON.parse(userStr) });
+      } catch {
+        localStorage.removeItem('trading_token');
+        localStorage.removeItem('trading_user');
+      }
+    }
+  },
 
   updatePrice: (update: PriceUpdate) => {
     set((state) => {
@@ -61,20 +124,29 @@ export const useTradingStore = create<TradingState>((set) => ({
   // ── Alert actions ──────────────────────────────────────────────────────────
 
   fetchAlerts: async () => {
+    const { token } = useTradingStore.getState();
+    if (!token) return;
     try {
-      const res = await fetch(`${API}/alerts`);
+      const res = await fetch(`${API}/alerts`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       const data: Alert[] = await res.json();
       set({ alerts: data });
     } catch {
-      // server may not be ready yet — silently ignore
+      // ignore
     }
   },
 
   addAlert: async (ticker, condition, threshold) => {
+    const { token } = useTradingStore.getState();
+    if (!token) return null;
     try {
       const res = await fetch(`${API}/alerts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ ticker, condition, threshold }),
       });
       if (!res.ok) return null;
@@ -87,8 +159,13 @@ export const useTradingStore = create<TradingState>((set) => ({
   },
 
   removeAlert: async (id) => {
+    const { token } = useTradingStore.getState();
+    if (!token) return;
     try {
-      await fetch(`${API}/alerts/${id}`, { method: 'DELETE' });
+      await fetch(`${API}/alerts/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
       set((state) => ({ alerts: state.alerts.filter((a) => a.id !== id) }));
     } catch {
       // ignore

@@ -5,6 +5,7 @@ const cors = require("cors");
 
 const HistoryCache = require("./src/cache");
 const alertsStore = require("./src/alertsStore");
+const auth = require("./src/auth");
 
 const app = express();
 app.use(cors());
@@ -51,10 +52,36 @@ const cache = new HistoryCache(CACHE_TTL_MS);
 // ─── REST API ─────────────────────────────────────────────────────────────────
 
 /**
+ * POST /register
+ * Register a new user.
+ */
+app.post("/register", async (req, res) => {
+    const { username, password } = req.body || {};
+    const result = await auth.register(username, password);
+    if (!result.ok) {
+        return res.status(400).json({ error: result.error });
+    }
+    res.status(201).json(result.user);
+});
+
+/**
+ * POST /login
+ * Authenticate user and return JWT.
+ */
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body || {};
+    const result = await auth.login(username, password);
+    if (!result.ok) {
+        return res.status(401).json({ error: result.error });
+    }
+    res.json({ token: result.token, user: result.user });
+});
+
+/**
  * GET /tickers
  * Returns the list of all available ticker symbols.
  */
-app.get("/tickers", (req, res) => {
+app.get("/tickers", auth.authenticateToken, (req, res) => {
     res.json(tickers);
 });
 
@@ -70,7 +97,7 @@ app.get("/tickers", (req, res) => {
  * Query params:
  *  - limit (number, 1–500, default 100): number of most-recent data points to return
  */
-app.get("/history/:ticker", (req, res) => {
+app.get("/history/:ticker", auth.authenticateToken, (req, res) => {
     const { ticker } = req.params;
 
     if (!history[ticker]) {
@@ -109,7 +136,7 @@ app.get("/history/:ticker", (req, res) => {
  * Create a price threshold alert.
  * Body: { ticker, condition: "above"|"below", threshold }
  */
-app.post("/alerts", (req, res) => {
+app.post("/alerts", auth.authenticateToken, (req, res) => {
     const { ticker, condition, threshold } = req.body || {};
 
     if (!tickers.includes((ticker || "").toUpperCase())) {
@@ -128,7 +155,7 @@ app.post("/alerts", (req, res) => {
  * GET /alerts
  * List all active (and triggered) alerts.
  */
-app.get("/alerts", (req, res) => {
+app.get("/alerts", auth.authenticateToken, (req, res) => {
     res.json(alertsStore.list());
 });
 
@@ -136,7 +163,7 @@ app.get("/alerts", (req, res) => {
  * DELETE /alerts/:id
  * Remove an alert by id.
  */
-app.delete("/alerts/:id", (req, res) => {
+app.delete("/alerts/:id", auth.authenticateToken, (req, res) => {
     const deleted = alertsStore.remove(req.params.id);
     if (!deleted) {
         return res.status(404).json({ error: "Alert not found" });
@@ -148,7 +175,7 @@ app.delete("/alerts/:id", (req, res) => {
  * GET /health
  * Returns server uptime, cache diagnostics, and active alert count.
  */
-app.get("/health", (req, res) => {
+app.get("/health", auth.authenticateToken, (req, res) => {
     res.json({
         status: "ok",
         uptimeSeconds: Math.floor(process.uptime()),
@@ -254,8 +281,9 @@ const updateInterval = setInterval(() => {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 if (require.main === module) {
-    server.listen(3000, () => {
-        console.log("Backend running on http://localhost:3000");
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+        console.log(`Backend running on http://localhost:${PORT}`);
         console.log(`Tickers: ${tickers.join(", ")}`);
         console.log(`Cache TTL: ${CACHE_TTL_MS / 1000}s | Max history points: ${MAX_HISTORY}`);
     });

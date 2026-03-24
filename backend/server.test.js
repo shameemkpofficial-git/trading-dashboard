@@ -142,34 +142,65 @@ test("AlertsStore: evaluateAll() correctly handles 'below' condition", () => {
     assert.strictEqual(firedWith, 24999);
 });
 
-// ─── REST API ─────────────────────────────────────────────────────────────────
+// ─── REST API Tests (Authenticated) ──────────────────────────────────────────
+let testToken = "";
 
-test("GET /tickers returns full ticker array", async () => {
-    const res = await fetch("http://localhost:3000/tickers").catch(() => null);
+test("Helper: Login to get a token for tests", async () => {
+    // Register first
+    await fetch("http://localhost:3000/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "testadmin", password: "password123" }),
+    }).catch(() => null);
+
+    // Login
+    const res = await fetch("http://localhost:3000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: "testadmin", password: "password123" }),
+    });
+    const body = await res.json();
+    testToken = body.token;
+    assert.ok(testToken, "Expected to receive a token");
+});
+
+test("GET /tickers returns 200 with JSON list", async () => {
+    const res = await fetch("http://localhost:3000/tickers", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res) return;
+    assert.strictEqual(res.status, 200);
     const body = await res.json();
     assert.deepStrictEqual(body, tickers);
 });
 
 test("GET /history/AAPL?limit=5 returns at most 5 points", async () => {
-    const res = await fetch("http://localhost:3000/history/AAPL?limit=5").catch(() => null);
+    const res = await fetch("http://localhost:3000/history/AAPL?limit=5", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res) return;
     const body = await res.json();
     assert.ok(body.length <= 5);
 });
 
 test("GET /history/UNKNOWN returns 404", async () => {
-    const res = await fetch("http://localhost:3000/history/UNKNOWN").catch(() => null);
+    const res = await fetch("http://localhost:3000/history/UNKNOWN", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res) return;
     assert.strictEqual(res.status, 404);
 });
 
 test("GET /history/TSLA returns X-Cache header", async () => {
     cache.clear();
-    const res1 = await fetch("http://localhost:3000/history/TSLA").catch(() => null);
+    const res1 = await fetch("http://localhost:3000/history/TSLA", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res1) return;
     assert.strictEqual(res1.headers.get("x-cache"), "MISS");
-    const res2 = await fetch("http://localhost:3000/history/TSLA").catch(() => null);
+    const res2 = await fetch("http://localhost:3000/history/TSLA", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res2) return;
     assert.strictEqual(res2.headers.get("x-cache"), "HIT");
 });
@@ -177,7 +208,10 @@ test("GET /history/TSLA returns X-Cache header", async () => {
 test("POST /alerts creates an alert and GET /alerts lists it", async () => {
     const create = await fetch("http://localhost:3000/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${testToken}`
+        },
         body: JSON.stringify({ ticker: "AAPL", condition: "above", threshold: 99999 }),
     }).catch(() => null);
     if (!create) return;
@@ -185,19 +219,27 @@ test("POST /alerts creates an alert and GET /alerts lists it", async () => {
     const alert = await create.json();
     assert.ok(alert.id);
 
-    const list = await fetch("http://localhost:3000/alerts").catch(() => null);
+    const list = await fetch("http://localhost:3000/alerts", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!list) return;
     const alerts = await list.json();
     assert.ok(alerts.some((a) => a.id === alert.id));
 
     // cleanup
-    await fetch(`http://localhost:3000/alerts/${alert.id}`, { method: "DELETE" }).catch(() => null);
+    await fetch(`http://localhost:3000/alerts/${alert.id}`, { 
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
 });
 
 test("POST /alerts rejects unknown ticker", async () => {
     const res = await fetch("http://localhost:3000/alerts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${testToken}`
+        },
         body: JSON.stringify({ ticker: "FAKE", condition: "above", threshold: 100 }),
     }).catch(() => null);
     if (!res) return;
@@ -207,13 +249,16 @@ test("POST /alerts rejects unknown ticker", async () => {
 test("DELETE /alerts/:id returns 404 for unknown id", async () => {
     const res = await fetch("http://localhost:3000/alerts/nonexistent-id", {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${testToken}` }
     }).catch(() => null);
     if (!res) return;
     assert.strictEqual(res.status, 404);
 });
 
 test("GET /health returns status ok with alerts field", async () => {
-    const res = await fetch("http://localhost:3000/health").catch(() => null);
+    const res = await fetch("http://localhost:3000/health", {
+        headers: { Authorization: `Bearer ${testToken}` }
+    }).catch(() => null);
     if (!res) return;
     const body = await res.json();
     assert.strictEqual(body.status, "ok");
